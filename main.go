@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -31,7 +32,6 @@ func main() {
 	}
 
 	selected := selectMETAR(metars)
-	fmt.Println("METAR:")
 	fmt.Println(selected.Raw)
 	fmt.Println()
 
@@ -45,8 +45,22 @@ func main() {
 		fmt.Printf("Can't find TAF for %q\n", selected.StationID)
 		return
 	}
-	fmt.Println("TAF:")
-	fmt.Println(selectedTAF.Raw)
+	printTAF(selectedTAF.Raw)
+}
+
+func printTAF(raw string) {
+	for _, token := range strings.Split(raw, " ") {
+		if isChangeIndicator(token) {
+			fmt.Print("\n")
+		}
+		fmt.Print(token)
+		fmt.Print(" ")
+	}
+	fmt.Println()
+}
+
+func isChangeIndicator(token string) bool {
+	return token == "TEMPO" || token == "BECMG" || token == "FM" || token == "PROB"
 }
 
 func selectMETAR(metars []metar) metar {
