@@ -66,8 +66,13 @@ func isChangeIndicator(token string) bool {
 func selectMETAR(metars []metar) metar {
 	rand.Seed(time.Now().Unix())
 	l := len(metars)
-	s := rand.Intn(l)
-	return metars[s]
+	for {
+		s := rand.Intn(l)
+		candidate := metars[s]
+		if strings.HasPrefix(candidate.StationID, "K") {
+			return candidate
+		}
+	}
 }
 
 func getMETARs() ([]metar, error) {
