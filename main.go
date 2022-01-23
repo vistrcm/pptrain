@@ -10,21 +10,46 @@ import (
 	"time"
 )
 
+const headerLines = 5
+
 type metar struct {
-	Raw string
+	Raw       string
+	StationID string
 }
+
+type taf struct {
+	Raw       string
+	StationID string
+}
+
+type tafMap map[string]taf
 
 func main() {
-	 metars, err := getMETARs()
-	 if err != nil {
-		 panic(fmt.Sprintf("error getting METARs: %q", err))
-	 }
+	metars, err := getMETARs()
+	if err != nil {
+		panic(fmt.Sprintf("error getting METARs: %q", err))
+	}
 
-	 selected := selectMETAR(metars)
-	 fmt.Println(selected.Raw)
+	selected := selectMETAR(metars)
+	fmt.Println("METAR:")
+	fmt.Println(selected.Raw)
+	fmt.Println()
+
+	tafs, err := getTAFs()
+	if err != nil {
+		panic(fmt.Sprintf("error getting TAFS: %q", err))
+	}
+
+	selectedTAF, presented := tafs[selected.StationID]
+	if !presented {
+		fmt.Printf("Can't find TAF for %q\n", selected.StationID)
+		return
+	}
+	fmt.Println("TAF:")
+	fmt.Println(selectedTAF.Raw)
 }
 
-func selectMETAR(metars []metar) metar{
+func selectMETAR(metars []metar) metar {
 	rand.Seed(time.Now().Unix())
 	l := len(metars)
 	s := rand.Intn(l)
@@ -40,15 +65,17 @@ func getMETARs() ([]metar, error) {
 
 	reader := bufio.NewReader(resp.Body)
 
-	err = readHeader(reader)
-	if err != nil{
+	err = readHeader(reader, headerLines)
+	if err != nil {
 		return nil, err
 	}
 
 	r := csv.NewReader(reader)
+	if err := readCSVHeader(r); err != nil {
+		return nil, err
+	}
 
 	metars := []metar{}
-
 
 	for {
 		record, err := r.Read()
@@ -60,7 +87,7 @@ func getMETARs() ([]metar, error) {
 			return metars, fmt.Errorf("error parsing CSV: %w", err)
 		}
 
-		metar :=  metar{Raw: record[0]}
+		metar := metar{Raw: record[0], StationID: record[1]}
 		metars = append(metars, metar)
 	}
 
@@ -68,42 +95,71 @@ func getMETARs() ([]metar, error) {
 
 }
 
-func readHeader(reader *bufio.Reader) error {
-	_, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("error reading header on 'errors' line")
-	}
-	//fmt.Printf("errors: %q\n", errors)
+func readCSVHeader(r *csv.Reader) error {
+	_, err := r.Read()
 
-	_, err = reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("error reading headers on 'warnings' line")
+		return fmt.Errorf("error parsing CSV header: %w", err)
 	}
-	//fmt.Printf("warnings: %q\n", warnings)
 
-	_, err = reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("error reading headers on 'timing' line")
-	}
-	//fmt.Printf("timing: %q\n", timing)
+	return nil
+}
 
-	_, err = reader.ReadString('\n')
+func getTAFs() (tafMap, error) {
+	resp, err := http.Get("https://www.aviationweather.gov/adds/dataserver_current/current/tafs.cache.csv")
 	if err != nil {
-		return fmt.Errorf("error reading headers on 'dataSource' line")
+		return nil, fmt.Errorf("failed requesting metars cache")
 	}
-	//fmt.Printf("dataSource: %q\n", dataSource)
+	defer resp.Body.Close()
 
-	_, err = reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("error reading headers on 'numResults' line")
-	}
-	//fmt.Printf("numResults: %q\n", numResults)
+	reader := bufio.NewReader(resp.Body)
 
-	_, err = reader.ReadString('\n')
+	err = readHeader(reader, headerLines)
 	if err != nil {
-		return fmt.Errorf("error reading headers on 'csvHeader' line")
+		return nil, err
 	}
-	//fmt.Printf("csvHeader: %q\n", csvHeader)
+
+	r := csv.NewReader(reader)
+	r.FieldsPerRecord = -1 // for some reason TAFs has variable amount of fields
+
+	if err := readCSVHeader(r); err != nil {
+		return nil, err
+	}
+
+	tafs := make(tafMap)
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return tafs, fmt.Errorf("error parsing CSV: %w", err)
+		}
+
+		stationID := record[1]
+		_, prst := tafs[stationID]
+		if prst {
+			return nil, fmt.Errorf("unexpected duplicate taf for %q", stationID)
+		}
+
+		taf := taf{Raw: record[0], StationID: stationID}
+		tafs[stationID] = taf
+	}
+
+	return tafs, nil
+
+}
+
+func readHeader(reader *bufio.Reader, skip int) error {
+
+	for i := 0; i <= skip-1; i++ {
+		_, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("error reading header line %d", i)
+		}
+	}
 
 	return nil
 }
