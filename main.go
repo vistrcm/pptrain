@@ -61,7 +61,13 @@ func printTAF(raw string) {
 }
 
 func isChangeIndicator(token string) bool {
-	return token == "TEMPO" || token == "BECMG" || token == "FM" || token == "PROB"
+	if strings.HasPrefix(token, "FM") {
+		return true
+	}
+	if token == "TEMPO" || token == "BECMG" || token == "PROB" {
+		return true
+	}
+	return false
 }
 
 func selectMETAR(metars []metar) metar {
