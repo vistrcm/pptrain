@@ -51,7 +51,8 @@ func main() {
 func printTAF(raw string) {
 	for _, token := range strings.Split(raw, " ") {
 		if isChangeIndicator(token) {
-			fmt.Print("\n")
+			fmt.Println()
+			fmt.Print("     ")  // changes indented
 		}
 		fmt.Print(token)
 		fmt.Print(" ")
