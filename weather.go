@@ -25,8 +25,15 @@ type taf struct {
 
 type tafMap map[string]taf
 
-func printTAF(raw string) {
-	for _, token := range strings.Split(raw, " ") {
+func printTAF(tafs tafMap, selected string) {
+	selectedTAF, presented := tafs[selected]
+	if !presented {
+		fmt.Printf("No TAF for %q\n", selected)
+		return
+	}
+
+	fmt.Printf("TAF for %q:\n", selected)
+	for _, token := range strings.Split(selectedTAF.Raw, " ") {
 		if isChangeIndicator(token) {
 			fmt.Println()
 			fmt.Print("     ") // changes indented
