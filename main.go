@@ -12,7 +12,7 @@ func main() {
 
 	selected := selectMETAR(metars)
 
-	fmt.Printf("Let's plan flight to the Airport: %q", selected.StationID)
+	fmt.Printf("Let's plan flight to the Airport: %q\n", selected.StationID)
 
 	fmt.Println(selected.Raw)
 	fmt.Println()
